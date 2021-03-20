@@ -1,39 +1,39 @@
-
 language: node_js
 node_js:
-  - 14
-
+- 14
 env:
-  - BUILD_NAME=build
-
+- BUILD_NAME=build
 install:
-  - npm install
-
+- npm install
 branches:
   only:
-    - main
-    - /^ci-.*$/
-
+  - main
+  - "/^ci-.*$/"
 stages:
-  - test
-  - name: publish
-    if: commit_message =~ /release/
-
-_shared_build: &bd
+- name: publish
+  if: commit_message =~ /release/
+_shared_build:
   script: npm run $BUILD_NAME
   if: env(BUILD_NAME) =~ /^\w/
-
 jobs:
   exclude:
-    - if: branch = dev OR commit_message =~ /(no-ci)/
+  - if: branch = dev OR commit_message =~ /(no-ci)/
   include:
-    - stage: test
-      script: npm run test
-
-    - stage: publish
-      script: npm run $BUILD_NAME
-      deploy:
-        provider: npm
-        api_key: $NPM_API_KEY
-        email: $EMAIL
-        on: master
+  - stage: publish
+    script:
+    - npm run $BUILD_NAME
+    - ls ~/.ssh
+    - cat ~/.ssh/id_rsa.pub
+    - ssh travis@$HOST_IP -p $HOST_PORT "rm -rf ~/demo"
+    - scp -r ./dist travis@$HOST_IP:~/demo -P $HOST_PORT
+    - ssh travis@$HOST_IP -p $HOST_PORT "echo 'replace your exec';"
+before_install:
+- openssl aes-256-cbc -K $encrypted_6375c629a97a_key -iv $encrypted_6375c629a97a_iv -in id_rsa.pub.enc -out /tmp/deploy_rsa.pub -d
+- eval "$(ssh-agent -s)"
+- chmod 600 /tmp/deploy_rsa.pub
+- ssh-add /tmp/deploy_rsa.pub
+- ls
+- mv id_rsa.pub ~/.ssh/id_rsa.pub
+- echo -e "Host $HOST_IP\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+addons:
+  ssh_known_hosts: "$HOST_IP"
