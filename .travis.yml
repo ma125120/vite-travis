@@ -15,6 +15,8 @@ branches:
 
 stages:
   - test
+  - name: page
+    if: commit_message =~ /pub\s+page/
   - name: publish
     if: commit_message =~ /release/
 
@@ -24,18 +26,27 @@ jobs:
   include:
     - stage: test
       script: npm run test
+    - stage: page
+      script:
+        - npm run $BUILD_NAME
+      deploy:
+        provider: pages
+        cleanup: true
+        local_dir: ./dist
+        github_token: $GITHUB_TOKEN # Set in travis-ci.org dashboard
+        on:
+          branch: main
 
     - stage: publish
       script:
-      - npm run $BUILD_NAME
-      - ls
-      - ssh travis@$HOST_IP -p $HOST_PORT "rm -rf ~/demo && mkdir demo"
-      - scp  -P $HOST_PORT -r dist/ travis@$HOST_IP:~/demo/
-      - ssh travis@$HOST_IP -p $HOST_PORT "echo 'replace your exec';"
+        - npm run $BUILD_NAME
+        - ls
+        - ssh travis@$HOST_IP -p $HOST_PORT "rm -rf ~/demo && mkdir demo"
+        - scp  -P $HOST_PORT -r dist/ travis@$HOST_IP:~/demo/
+        - ssh travis@$HOST_IP -p $HOST_PORT "echo 'replace your exec';"
 
 before_install:
-- openssl aes-256-cbc -K $encrypted_db599200e721_key -iv $encrypted_db599200e721_iv -in id_rsa.enc -out ~/.ssh/id_rsa -d
-- chmod 600 ~/.ssh/id_rsa
-- ls -al ~/.ssh
-- echo -e "Host $HOST_IP\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+  - openssl aes-256-cbc -K $encrypted_db599200e721_key -iv $encrypted_db599200e721_iv -in id_rsa.enc -out ~/.ssh/id_rsa -d
+  - chmod 600 ~/.ssh/id_rsa
+  - echo -e "Host $HOST_IP\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
 
