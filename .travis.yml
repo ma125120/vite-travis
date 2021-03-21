@@ -13,6 +13,13 @@ branches:
   - main
   - "/^ci-.*$/"
 
+notifications:
+  email:
+    recipients:
+      - $EMAIL_SELF
+    on_success: always # default: change
+    on_failure: always # default: always
+
 stages:
   - test
   - name: page
