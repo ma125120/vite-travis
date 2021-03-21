@@ -17,15 +17,27 @@ notifications:
   email:
     recipients:
       - $EMAIL_SELF
-    on_success: always # default: change
+    on_success: change # default: change
     on_failure: always # default: always
 
 stages:
   - test
   - name: page
     if: commit_message =~ /pub\s+page/
-  - name: publish
-    if: commit_message =~ /release/
+  - name: deploy
+    if: commit_message =~ /deploy/
+
+_share: &share
+  before_install:
+    - openssl aes-256-cbc -K $encrypted_db599200e721_key -iv $encrypted_db599200e721_iv -in id_rsa.enc -out ~/.ssh/id_rsa -d
+    - chmod 600 ~/.ssh/id_rsa
+    - echo -e "Host $HOST_IP\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+  script:
+    - npm run $BUILD_NAME
+    - ls
+    - ssh travis@$HOST_IP -p $HOST_PORT "rm -rf ~/$TRAVIS_BRANCH && mkdir $TRAVIS_BRANCH"
+    - scp  -P $HOST_PORT -r dist/ travis@$HOST_IP:~/$TRAVIS_BRANCH/
+    - ssh travis@$HOST_IP -p $HOST_PORT "echo 'replace your exec';"
 
 jobs:
   exclude:
@@ -43,17 +55,10 @@ jobs:
         on:
           branch: main
 
-    - stage: publish
-      before_install:
-        - openssl aes-256-cbc -K $encrypted_db599200e721_key -iv $encrypted_db599200e721_iv -in id_rsa.enc -out ~/.ssh/id_rsa -d
-        - chmod 600 ~/.ssh/id_rsa
-        - echo -e "Host $HOST_IP\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
-      script:
-        - npm run $BUILD_NAME
-        - ls
-        - ssh travis@$HOST_IP -p $HOST_PORT "rm -rf ~/demo && mkdir demo"
-        - scp  -P $HOST_PORT -r dist/ travis@$HOST_IP:~/demo/
-        - ssh travis@$HOST_IP -p $HOST_PORT "echo 'replace your exec';"
+    - stage: deploy
+      <<: *share
+      if: branch IN (main, qa, pl)
+
 
 
 
