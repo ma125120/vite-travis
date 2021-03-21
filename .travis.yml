@@ -17,15 +17,37 @@ notifications:
   email:
     recipients:
       - $EMAIL_SELF
-    on_success: always # default: change
+    on_success: change # default: change
     on_failure: always # default: always
 
 stages:
   - test
   - name: page
     if: commit_message =~ /pub\s+page/
-  - name: publish
-    if: commit_message =~ /release/
+  - name: deploy
+    if: commit_message =~ /deploy/
+
+_share: &share
+  before_install:
+    # 解密
+    - openssl aes-256-cbc -K $encrypted_db599200e721_key -iv $encrypted_db599200e721_iv -in id_rsa.enc -out ~/.ssh/id_rsa -d
+    # 设置正确的权限
+    - chmod 600 ~/.ssh/id_rsa
+    # 目标IP不进行校验，防止阻碍流程
+    - echo -e "Host $HOST_IP\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
+  script:
+    # 构建脚本
+    - npm run $BUILD_NAME
+    # 截取分支名，ci-qa 获得 qa，并设置为 DEST_DIR 变量
+    - export DEST_DIR=`echo $TRAVIS_BRANCH | cut -d "-" -f 2`
+    # 删除远程目标文件夹，并新建目录（这一步需要自己衡量是否需要，一般个人开发建议删除）
+    - ssh travis@$HOST_IP -p $HOST_PORT "rm -rf ~/$DEST_DIR && mkdir ~/$DEST_DIR"
+    # 将本地文件上传到服务器
+    # dist/ 将会在目标文件夹下 存在一个 dist 文件夹
+    # dist/. 将直接存储dist目录下的所有文件，而不包括目录名
+    - scp  -P $HOST_PORT -r dist/. travis@$HOST_IP:~/$DEST_DIR
+    # 上传文件完毕后，可能需要 启动服务 等，自行替换
+    - ssh travis@$HOST_IP -p $HOST_PORT "echo 'replace your exec';"
 
 jobs:
   exclude:
@@ -43,17 +65,10 @@ jobs:
         on:
           branch: main
 
-    - stage: publish
-      before_install:
-        - openssl aes-256-cbc -K $encrypted_db599200e721_key -iv $encrypted_db599200e721_iv -in id_rsa.enc -out ~/.ssh/id_rsa -d
-        - chmod 600 ~/.ssh/id_rsa
-        - echo -e "Host $HOST_IP\n\tStrictHostKeyChecking no\n" >> ~/.ssh/config
-      script:
-        - npm run $BUILD_NAME
-        - ls
-        - ssh travis@$HOST_IP -p $HOST_PORT "rm -rf ~/demo && mkdir demo"
-        - scp  -P $HOST_PORT -r dist/ travis@$HOST_IP:~/demo/
-        - ssh travis@$HOST_IP -p $HOST_PORT "echo 'replace your exec';"
+    - stage: deploy
+      <<: *share
+      if: branch IN (main, ci-qa, ci-pl)
+
 
 
 
